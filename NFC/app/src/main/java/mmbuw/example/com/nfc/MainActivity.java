@@ -38,6 +38,8 @@ public class MainActivity extends ActionBarActivity {
     private Button mShowContentButton;
     private NfcAdapter mNfcAdapter;
     private String mStringTagContent = "";
+    private String mASCIICode = "";
+    private String mHexCode = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -189,6 +191,23 @@ public class MainActivity extends ActionBarActivity {
         }
     }
 
+    /**
+     * getHexString method is used from following link
+     * https://github.com/bmeike/ProgrammingAndroidExamples/blob/master/SensorDemos/src/com/oreilly/demo/android/pa/sensordemo/NFC.java
+     */
+    private final static char[] HEX = new char[]{ '0', '1', '2', '3', '4', '5', '6', '7','8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+
+    // convert bytes to a hex string
+    private static String getHexString(final byte[] bytes) {
+        StringBuffer hex = new StringBuffer(bytes.length * 2);
+        for (int i = 0; i < bytes.length; i++) {
+            for (int j = 1; j >= 0; j--) {
+                hex.append(HEX[(bytes[i] >> (j * 4)) & 0xF]);
+            }
+        }
+        return hex.toString();
+    }
+
     private class NdefReaderTask extends AsyncTask<Tag, Void, String> {
 
         @Override
@@ -236,11 +255,14 @@ public class MainActivity extends ActionBarActivity {
             // Get the Language Code
             int languageCodeLength = payload[0] & 0063;
 
-            // String languageCode = new String(payload, 1, languageCodeLength, "US-ASCII");
-            // e.g. "en"
+            mHexCode = getHexString(Arrays.copyOfRange(payload, languageCodeLength + 1, payload.length));
 
             // Get the Text
-            mStringTagContent = new String(payload, languageCodeLength + 1, payload.length - languageCodeLength - 1, textEncoding);
+            mASCIICode = new String(payload, languageCodeLength + 1, payload.length - languageCodeLength - 1, textEncoding);
+            mStringTagContent += "ASCII: \n" + mASCIICode;
+            mStringTagContent += "\n\nHex: \n" + mHexCode;
+
+            String text = payload.toString();
             String information = "\nID: " + record.getId().toString();
             information += "\nTYPE: " + record.getTnf();
             information += "\nmime/type: " + record.toMimeType().toString();
