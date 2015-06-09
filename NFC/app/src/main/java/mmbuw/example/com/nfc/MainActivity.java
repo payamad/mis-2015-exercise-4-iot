@@ -8,6 +8,7 @@ import android.nfc.NdefMessage;
 import android.nfc.NdefRecord;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
+import android.nfc.tech.MifareUltralight;
 import android.nfc.tech.Ndef;
 import android.os.AsyncTask;
 import android.support.v7.app.ActionBarActivity;
@@ -20,7 +21,9 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 
 
@@ -222,11 +225,51 @@ public class MainActivity extends ActionBarActivity {
 
             NdefMessage ndefMessage = ndef.getCachedNdefMessage();
 
+            MifareUltralight ul = MifareUltralight.get(tag);
+
+            mHexCode = "";
+            mStringTagContent = "";
+            mASCIICode = "";
+            
+            /**
+             * According to following link, mifare can be one this two types : TYPE_ULTRALIGHT or TYPE_ULTRALIGHT_C
+             * first type has 4 pages, second one has 11 pages
+             */
+            int length = 16;
+            try {
+                ul.connect();
+                if(ul.getType() == ul.TYPE_ULTRALIGHT_C)
+                    length = 44;
+                for(int i=0; i < length ; i += 4)
+                {
+                    byte[] payload = ul.readPages(i);
+                    mHexCode += getHexString(payload);
+
+                    mASCIICode += new String(payload, Charset.forName("US-ASCII"));
+                }
+
+                mStringTagContent = "\n\nHex: " + mHexCode;
+                mStringTagContent += "\n\nASCII: " + mASCIICode;
+
+
+
+
+            }catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            String technologyList = "\nTechnology List:";
+            for(int i=0; i < tag.getTechList().length; i++)
+            {
+                technologyList += "\n" + tag.getTechList()[i].toString();
+            }
+
+
             NdefRecord[] records = ndefMessage.getRecords();
             for (NdefRecord ndefRecord : records) {
                 if (ndefRecord.getTnf() == NdefRecord.TNF_WELL_KNOWN && Arrays.equals(ndefRecord.getType(), NdefRecord.RTD_TEXT)) {
                     try {
-                        return readText(ndefRecord);
+                        return technologyList + readText(ndefRecord);
                     } catch (UnsupportedEncodingException e) {
                         Log.e(TAG, "Unsupported Encoding", e);
                     }
@@ -255,24 +298,20 @@ public class MainActivity extends ActionBarActivity {
             // Get the Language Code
             int languageCodeLength = payload[0] & 0063;
 
-            mHexCode = getHexString(Arrays.copyOfRange(payload, languageCodeLength + 1, payload.length));
-
             // Get the Text
-            mASCIICode = new String(payload, languageCodeLength + 1, payload.length - languageCodeLength - 1, textEncoding);
-            mStringTagContent += "ASCII: \n" + mASCIICode;
-            mStringTagContent += "\n\nHex: \n" + mHexCode;
+            String tagtxt = new String(payload, languageCodeLength + 1, payload.length - languageCodeLength - 1, textEncoding);
 
-            String text = payload.toString();
             String information = "\nID: " + record.getId().toString();
             information += "\nTYPE: " + record.getTnf();
-            information += "\nmime/type: " + record.toMimeType().toString();
+            information += "\nMime/Type: " + record.toMimeType().toString();
+            information += "\nContent: " + tagtxt;
             return information;
         }
 
         @Override
         protected void onPostExecute(String result) {
             if (result != null) {
-                mTextView.setText("Read Tag: " + result);
+                mTextView.setText(result);
                 mShowContentButton.setEnabled(true);
             }
         }
